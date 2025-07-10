@@ -104,6 +104,8 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
+extern uint64 sys_trace(void);
+extern uint64 sys_sysinfo(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -127,6 +129,35 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_trace]   sys_trace,
+[SYS_sysinfo] sys_sysinfo,
+};
+
+// Array of system call names for tracing
+static char *syscall_names[] = {
+[SYS_fork]    "fork",
+[SYS_exit]    "exit",
+[SYS_wait]    "wait",
+[SYS_pipe]    "pipe",
+[SYS_read]    "read",
+[SYS_kill]    "kill",
+[SYS_exec]    "exec",
+[SYS_fstat]   "fstat",
+[SYS_chdir]   "chdir",
+[SYS_dup]     "dup",
+[SYS_getpid]  "getpid",
+[SYS_sbrk]    "sbrk",
+[SYS_sleep]   "sleep",
+[SYS_uptime]  "uptime",
+[SYS_open]    "open",
+[SYS_write]   "write",
+[SYS_mknod]   "mknod",
+[SYS_unlink]  "unlink",
+[SYS_link]    "link",
+[SYS_mkdir]   "mkdir",
+[SYS_close]   "close",
+[SYS_trace]   "trace",
+[SYS_sysinfo] "sysinfo",
 };
 
 void
@@ -137,7 +168,27 @@ syscall(void)
 
   num = p->trapframe->a7;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    p->trapframe->a0 = syscalls[num]();
+    // For trace syscall, check if the new mask would trace itself
+    int should_trace = 0;
+    if(num == SYS_trace) {
+      // Get the new mask from the trace syscall argument
+      int new_mask;
+      if(argint(0, &new_mask) >= 0) {
+        should_trace = (new_mask & (1 << num)) != 0;
+      }
+    } else {
+      should_trace = (p->trace_mask & (1 << num)) != 0;
+    }
+    
+    // Call the system call
+    uint64 ret = syscalls[num]();
+    
+    // Print trace output if needed
+    if(should_trace) {
+      printf("%d: syscall %s -> %d\n", p->pid, syscall_names[num], ret);
+    }
+    
+    p->trapframe->a0 = ret;
   } else {
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);
