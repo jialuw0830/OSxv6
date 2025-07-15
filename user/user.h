@@ -28,7 +28,7 @@ int uptime(void);
 int connect(uint32, uint16, uint16);
 #endif
 #ifdef LAB_PGTBL
-int pgaccess(void *base, int len, void *mask);
+int pgaccess(const void *va, int npages, uint32 *abits);
 // usyscall region
 int ugetpid(void);
 #endif

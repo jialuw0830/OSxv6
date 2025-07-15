@@ -80,7 +80,24 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  uint64 va;
+  int npages;
+  uint64 user_abits;
+  if (argaddr(0, &va) < 0 || argint(1, &npages) < 0 || argaddr(2, &user_abits) < 0)
+    return -1;
+  if (npages > 32) // 最多支持32页
+    npages = 32;
+  struct proc *p = myproc();
+  uint32 abits = 0;
+  for (int i = 0; i < npages; i++) {
+    pte_t *pte = walk(p->pagetable, va + i * PGSIZE, 0);
+    if (pte && (*pte & PTE_V) && (*pte & PTE_A)) {
+      abits |= (1 << i);
+      *pte &= ~PTE_A; // 清除A位
+    }
+  }
+  if (copyout(p->pagetable, user_abits, (char *)&abits, sizeof(abits)) < 0)
+    return -1;
   return 0;
 }
 #endif

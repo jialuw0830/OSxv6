@@ -1,0 +1,35 @@
+Explain the output of vmprint in terms of Fig 3-4 from the text. What does page 0 contain? What is in page 2? When running in user mode, could the process read/write the memory mapped by page 1? What does the third to last page contain?
+
+The output of vmprint shows the page table structure of the first process (init) after it has finished exec()ing. Let me explain each part:
+
+1. "page table 0x0000000087f6e000" - This is the physical address of the root page table (level 1).
+
+2. "..0: pte 0x0000000021fda801 pa 0x0000000087f6a000" - This is the first entry (index 0) in the root page table. The PTE points to a level 2 page table at physical address 0x87f6a000. The flags show it's valid (V=1) but not readable/writable/executable by user mode (no R/W/X flags).
+
+3. ".. ..0: pte 0x0000000021fda401 pa 0x0000000087f69000" - This is the first entry in the level 2 page table, pointing to a level 3 page table at 0x87f69000.
+
+4. ".. .. ..0: pte 0x0000000021fdac1f pa 0x0000000087f6b000" - This is the first entry in the level 3 page table, mapping virtual address 0x0 to physical address 0x87f6b000. The flags 0x1f show it's valid, readable, writable, executable, and user-accessible (V=1, R=1, W=1, X=1, U=1). This is likely the text segment of the init process.
+
+5. ".. .. ..1: pte 0x0000000021fda00f pa 0x0000000087f68000" - This maps virtual address 0x1000 to physical address 0x87f68000. Flags 0x0f show it's valid, readable, writable, and user-accessible (V=1, R=1, W=1, U=1). This is likely the data segment.
+
+6. ".. .. ..2: pte 0x0000000021fd9c1f pa 0x0000000087f67000" - This maps virtual address 0x2000 to physical address 0x87f67000. Flags 0x1f show it's valid, readable, writable, executable, and user-accessible. This might be the stack or heap.
+
+7. "..255: pte 0x0000000021fdb401 pa 0x0000000087f6d000" - This is entry 255 in the root page table, pointing to another level 2 page table at 0x87f6d000. This maps the high virtual addresses.
+
+8. ".. ..511: pte 0x0000000021fdb001 pa 0x0000000087f6c000" - This is entry 511 in the level 2 page table, pointing to a level 3 page table at 0x87f6c000.
+
+9. ".. .. ..509: pte 0x0000000021fdd813 pa 0x0000000087f76000" - This maps a high virtual address to 0x87f76000. Flags 0x13 show it's valid, readable, and user-accessible (V=1, R=1, U=1). This is likely the trapframe page.
+
+10. ".. .. ..510: pte 0x0000000021fddc07 pa 0x0000000087f77000" - This maps another high virtual address to 0x87f77000. Flags 0x07 show it's valid, readable, and user-accessible (V=1, R=1, W=1, U=1). This is likely the trampoline page.
+
+11. ".. .. ..511: pte 0x0000000020001c0b pa 0x0000000080007000" - This is the third to last page, mapping to physical address 0x80007000. Flags 0x0b show it's valid, readable, and user-accessible (V=1, R=1, W=1, U=1). This is likely the USYSCALL page that we implemented for the shared system call optimization.
+
+To answer the specific questions:
+
+- Page 0 contains the root page table with 512 PTEs, most of which are invalid except for entries 0 and 255.
+
+- Page 2 (the level 3 page table at 0x87f69000) contains the actual page mappings for the low virtual addresses (0x0, 0x1000, 0x2000), which are the text, data, and stack segments of the process.
+
+- When running in user mode, the process CAN read/write the memory mapped by page 1 (the level 2 page table) because the PTEs in the level 3 page tables have the U (user) flag set, making those specific pages user-accessible.
+
+- The third to last page (entry 511 in the level 3 page table) contains the USYSCALL page that we implemented for the shared system call optimization, allowing fast access to process information like PID without a system call. 
