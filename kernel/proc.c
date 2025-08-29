@@ -141,6 +141,9 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  // Initialize trace mask to 0
+  p->trace_mask = 0;
+
   return p;
 }
 
@@ -302,6 +305,9 @@ fork(void)
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
+
+  // Copy trace mask from parent to child
+  np->trace_mask = p->trace_mask;
 
   pid = np->pid;
 
@@ -653,4 +659,19 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+// Return the number of processes that are not UNUSED
+int
+nproc(void)
+{
+  struct proc *p;
+  int count = 0;
+  
+  for(p = proc; p < &proc[NPROC]; p++){
+    if(p->state != UNUSED)
+      count++;
+  }
+  
+  return count;
 }
